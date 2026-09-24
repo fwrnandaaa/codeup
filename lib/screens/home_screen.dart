@@ -1,18 +1,9 @@
 import 'package:flutter/material.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _moedas = 12;
-  bool _desafioConcluido = false;
-
-  // Simula os tópicos da trilha vindos da API
-  final List<Map<String, dynamic>> _trilha = [
+  static const int _moedas = 12;
+  static const List<Map<String, dynamic>> _trilha = [
     {'nome': 'Variáveis', 'concluido': true},
     {'nome': 'Tipos de dados', 'concluido': true},
     {'nome': 'Operadores', 'concluido': true},
@@ -20,44 +11,39 @@ class _HomeScreenState extends State<HomeScreen> {
     {'nome': 'Funções', 'concluido': false},
   ];
 
-  // =====================================================
-  // EVENTOS — BOTÃO "COMEÇAR" (ação principal + encadeamento)
-  // =====================================================
 
-  void _onComecarPressed() {
-    // Lida com clique repetido de forma previsível: não deixa ganhar XP 2x
-    if (_desafioConcluido) {
+  void _onComecarPressed(BuildContext context) {
+    final proxima = _trilha.firstWhere(
+          (e) => e['concluido'] == false,
+      orElse: () => {},
+    );
+
+    if (proxima.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Você já concluiu o desafio de hoje! Volte amanhã.'),
+          content: Text('Você já completou toda a trilha disponível!'),
           backgroundColor: Colors.blueGrey,
         ),
       );
       return;
     }
 
-    // Encadeamento de eventos:
-    // onPressed -> verifica condição -> abre AlertDialog -> confirma -> fecha -> SnackBar + atualiza XP
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Iniciar desafio?'),
-        content: const Text('5 questões rápidas sobre Python. Pronto para começar?'),
+        content: Text('Próxima etapa: ${proxima['nome']}. Deseja começar?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.of(context).pop(); // fecha o AlertDialog
-              setState(() {
-                _desafioConcluido = true;
-                _moedas += 5;
-              });
+              Navigator.of(dialogContext).pop();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Desafio concluído! +5 XP'),
+                  content: Text('Desafio iniciado! Boa sorte.'),
                   backgroundColor: Colors.green,
                 ),
               );
@@ -69,38 +55,28 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // =====================================================
-  // EVENTOS — TRILHA (gesto: onTap e onLongPress)
-  // =====================================================
-
-  void _onTrilhaTap(String nome, bool concluido) {
-    if (concluido) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Revisando: $nome')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Complete os passos anteriores para desbloquear "$nome".'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-    }
+  void _onTrilhaTap(BuildContext context, String nome, bool concluido) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(concluido
+            ? 'Revisando: $nome'
+            : 'Complete os passos anteriores para desbloquear "$nome".'),
+        backgroundColor: concluido ? null : Colors.orange,
+      ),
+    );
   }
 
-  void _onTrilhaLongPress(String nome, bool concluido) {
+  void _onTrilhaLongPress(BuildContext context, String nome, bool concluido) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Detalhes da etapa'),
-        content: Text(
-          concluido
-              ? 'Você já concluiu "$nome". Parabéns!'
-              : '"$nome" está bloqueada. Complete as etapas anteriores para liberar.',
-        ),
+        content: Text(concluido
+            ? 'Você já concluiu "$nome". Parabéns!'
+            : '"$nome" está bloqueada. Complete as etapas anteriores para liberar.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Fechar'),
           ),
         ],
@@ -108,26 +84,22 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // =====================================================
-  // EVENTOS — BADGE DE MOEDAS (gesto: onTap e onLongPress)
-  // =====================================================
-
-  void _onMoedasTap() {
+  void _onMoedasTap(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Você tem $_moedas moedas de XP.')),
+      const SnackBar(content: Text('Você tem $_moedas moedas de XP.')),
     );
   }
 
-  void _onMoedasLongPress() {
+  void _onMoedasLongPress(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Histórico de XP'),
         content: const Text(
             '+3 XP: Variáveis\n+2 XP: Tipos de dados\n+7 XP: Desafios diários'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Fechar'),
           ),
         ],
@@ -135,9 +107,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // =====================================================
-  // BUILD PRINCIPAL
-  // =====================================================
 
   @override
   Widget build(BuildContext context) {
@@ -147,9 +116,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: LayoutBuilder(
           builder: (context, constraints) {
             if (constraints.maxWidth < 600) {
-              return _buildMobileLayout();
+              return _buildMobileLayout(context);
             } else {
-              return _buildDesktopLayout();
+              return _buildDesktopLayout(context);
             }
           },
         ),
@@ -157,13 +126,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // =====================================================
-  // LAYOUT MOBILE
-  // =====================================================
-  Widget _buildMobileLayout() {
+  Widget _buildMobileLayout(BuildContext context) {
     return Column(
       children: [
-        _buildHeader(),
+        _buildHeader(context),
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -171,9 +137,9 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 16),
-                _buildDesafioCard(),
+                _buildDesafioCard(context),
                 const SizedBox(height: 24),
-                _buildTrilhaSection(),
+                _buildTrilhaSection(context),
                 const SizedBox(height: 16),
               ],
             ),
@@ -184,13 +150,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // =====================================================
-  // LAYOUT DESKTOP/TABLET
-  // =====================================================
-  Widget _buildDesktopLayout() {
+  Widget _buildDesktopLayout(BuildContext context) {
     return Column(
       children: [
-        _buildHeader(),
+        _buildHeader(context),
         Expanded(
           child: SingleChildScrollView(
             child: Center(
@@ -201,9 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(child: _buildDesafioCard()),
+                      Expanded(child: _buildDesafioCard(context)),
                       const SizedBox(width: 24),
-                      Expanded(child: _buildTrilhaSection()),
+                      Expanded(child: _buildTrilhaSection(context)),
                     ],
                   ),
                 ),
@@ -216,9 +179,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ---------- WIDGETS AUXILIARES ----------
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
       child: Column(
@@ -234,10 +196,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF16326B)),
               ),
-              // ---- ÁREA DE GESTO: onTap e onLongPress ----
+
               GestureDetector(
-                onTap: _onMoedasTap,
-                onLongPress: _onMoedasLongPress,
+                onTap: () => _onMoedasTap(context),
+                onLongPress: () => _onMoedasLongPress(context),
                 child: Container(
                   padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -245,14 +207,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: const Color(0xFFFFF6E0),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
-                      const Icon(Icons.monetization_on,
+                      Icon(Icons.monetization_on,
                           color: Colors.amber, size: 20),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4),
                       Text('$_moedas',
-                          style:
-                          const TextStyle(fontWeight: FontWeight.bold)),
+                          style: TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -299,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDesafioCard() {
+  Widget _buildDesafioCard(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -316,16 +277,16 @@ class _HomeScreenState extends State<HomeScreen> {
           const Text('5 questões - 5 minutos', style: TextStyle(fontSize: 12)),
           const SizedBox(height: 16),
 
-          // ---- BOTÃO "COMEÇAR": onPressed com condição + encadeamento ----
+
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _onComecarPressed,
+              onPressed: () => _onComecarPressed(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: const Color(0xFF16326B),
               ),
-              child: Text(_desafioConcluido ? 'Concluído ✓' : 'Começar'),
+              child: const Text('Começar'),
             ),
           ),
         ],
@@ -333,7 +294,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildTrilhaSection() {
+  Widget _buildTrilhaSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -348,8 +309,8 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.only(right: 8),
               // ---- ÁREA DE GESTO: onTap e onLongPress ----
               child: GestureDetector(
-                onTap: () => _onTrilhaTap(nome, concluido),
-                onLongPress: () => _onTrilhaLongPress(nome, concluido),
+                onTap: () => _onTrilhaTap(context, nome, concluido),
+                onLongPress: () => _onTrilhaLongPress(context, nome, concluido),
                 child: CircleAvatar(
                   radius: 18,
                   backgroundColor:
