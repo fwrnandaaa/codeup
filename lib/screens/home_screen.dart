@@ -1,24 +1,21 @@
 import 'package:flutter/material.dart';
 
+import '../app_routes.dart';
+import '../models/app_state.dart';
+import '../navigation/navigation_helpers.dart';
+import '../navigation/shell_scope.dart';
+
+/// Aba "Home". Mantém o layout/gestos da versão anterior; agora a navegação
+/// inferior fica no MainShell e os dados vêm do AppState compartilhado.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
-  static const int _moedas = 12;
-  static const List<Map<String, dynamic>> _trilha = [
-    {'nome': 'Variáveis', 'concluido': true},
-    {'nome': 'Tipos de dados', 'concluido': true},
-    {'nome': 'Operadores', 'concluido': true},
-    {'nome': 'Condicionais', 'concluido': false},
-    {'nome': 'Funções', 'concluido': false},
-  ];
 
+  AppState get _state => AppState.instance;
 
   void _onComecarPressed(BuildContext context) {
-    final proxima = _trilha.firstWhere(
-          (e) => e['concluido'] == false,
-      orElse: () => {},
-    );
+    final proxima = _state.proximo;
 
-    if (proxima.isEmpty) {
+    if (proxima == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Você já completou toda a trilha disponível!'),
@@ -32,7 +29,7 @@ class HomeScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Iniciar desafio?'),
-        content: Text('Próxima etapa: ${proxima['nome']}. Deseja começar?'),
+        content: Text('Próxima etapa: ${proxima.nome}. Deseja começar?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -41,12 +38,8 @@ class HomeScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () {
               Navigator.of(dialogContext).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Desafio iniciado! Boa sorte.'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              // PUSH com arguments + aguarda resultado (pop com valor).
+              abrirDesafio(context, proxima.nome);
             },
             child: const Text('Confirmar'),
           ),
@@ -55,25 +48,32 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _onTrilhaTap(BuildContext context, String nome, bool concluido) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(concluido
-            ? 'Revisando: $nome'
-            : 'Complete os passos anteriores para desbloquear "$nome".'),
-        backgroundColor: concluido ? null : Colors.orange,
-      ),
-    );
+  void _onTrilhaTap(BuildContext context, int index) {
+    final item = _state.trilha[index];
+    if (_state.desbloqueado(index)) {
+      // PUSH na pilha da aba Home: Home -> Conteúdo (-> Desafio).
+      Navigator.of(context)
+          .pushNamed(AppRoutes.trilhaConteudo, arguments: item);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Complete os passos anteriores para desbloquear "${item.nome}".'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
   }
 
-  void _onTrilhaLongPress(BuildContext context, String nome, bool concluido) {
+  void _onTrilhaLongPress(BuildContext context, int index) {
+    final item = _state.trilha[index];
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Detalhes da etapa'),
-        content: Text(concluido
-            ? 'Você já concluiu "$nome". Parabéns!'
-            : '"$nome" está bloqueada. Complete as etapas anteriores para liberar.'),
+        content: Text(item.concluido
+            ? 'Você já concluiu "${item.nome}". Parabéns!'
+            : '"${item.nome}" ainda não foi concluída.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -86,7 +86,7 @@ class HomeScreen extends StatelessWidget {
 
   void _onMoedasTap(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Você tem $_moedas moedas de XP.')),
+      SnackBar(content: Text('Você tem ${_state.xp} moedas de XP.')),
     );
   }
 
@@ -95,8 +95,7 @@ class HomeScreen extends StatelessWidget {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Histórico de XP'),
-        content: const Text(
-            '+3 XP: Variáveis\n+2 XP: Tipos de dados\n+7 XP: Desafios diários'),
+        content: Text(_state.historico.take(5).join('\n')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
@@ -107,20 +106,22 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7FBFF),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 600) {
-              return _buildMobileLayout(context);
-            } else {
-              return _buildDesktopLayout(context);
-            }
-          },
+    return ListenableBuilder(
+      listenable: _state,
+      builder: (context, _) => Scaffold(
+        backgroundColor: const Color(0xFFF7FBFF),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 600) {
+                return _buildMobileLayout(context);
+              } else {
+                return _buildDesktopLayout(context);
+              }
+            },
+          ),
         ),
       ),
     );
@@ -145,7 +146,6 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ),
-        _buildBottomNav(),
       ],
     );
   }
@@ -174,11 +174,9 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
         ),
-        _buildBottomNav(),
       ],
     );
   }
-
 
   Widget _buildHeader(BuildContext context) {
     return Padding(
@@ -187,8 +185,9 @@ class HomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              const MenuButton(compacto: true),
+              const SizedBox(width: 12),
               const Text(
                 'CodeUP',
                 style: TextStyle(
@@ -196,7 +195,7 @@ class HomeScreen extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF16326B)),
               ),
-
+              const Spacer(),
               GestureDetector(
                 onTap: () => _onMoedasTap(context),
                 onLongPress: () => _onMoedasLongPress(context),
@@ -207,13 +206,13 @@ class HomeScreen extends StatelessWidget {
                     color: const Color(0xFFFFF6E0),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.monetization_on,
+                      const Icon(Icons.monetization_on,
                           color: Colors.amber, size: 20),
-                      SizedBox(width: 4),
-                      Text('$_moedas',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 4),
+                      Text('${_state.xp}',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
@@ -221,8 +220,9 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          const Text('Olá, Juliana!',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          Text('Olá, ${_state.userName}!',
+              style:
+              const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -238,7 +238,7 @@ class HomeScreen extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
-              value: 0.45,
+              value: _state.progresso,
               minHeight: 8,
               backgroundColor: Colors.grey[300],
               valueColor: const AlwaysStoppedAnimation(Color(0xFFE8896B)),
@@ -274,10 +274,8 @@ class HomeScreen extends StatelessWidget {
           const Text('Desafio de hoje',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 4),
-          const Text('5 questões - 5 minutos', style: TextStyle(fontSize: 12)),
+          const Text('3 questões - 5 minutos', style: TextStyle(fontSize: 12)),
           const SizedBox(height: 16),
-
-
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -302,66 +300,33 @@ class HomeScreen extends StatelessWidget {
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 12),
         Row(
-          children: _trilha.map((item) {
-            final nome = item['nome'] as String;
-            final concluido = item['concluido'] as bool;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              // ---- ÁREA DE GESTO: onTap e onLongPress ----
-              child: GestureDetector(
-                onTap: () => _onTrilhaTap(context, nome, concluido),
-                onLongPress: () => _onTrilhaLongPress(context, nome, concluido),
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor:
-                  concluido ? const Color(0xFFE8896B) : Colors.grey[300],
-                  child: Icon(
-                    concluido ? Icons.check : Icons.lock_outline,
-                    color: Colors.white,
-                    size: 18,
+          children: [
+            for (var i = 0; i < _state.trilha.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                // ---- ÁREA DE GESTO: onTap e onLongPress ----
+                child: GestureDetector(
+                  onTap: () => _onTrilhaTap(context, i),
+                  onLongPress: () => _onTrilhaLongPress(context, i),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: _state.trilha[i].concluido
+                        ? const Color(0xFFE8896B)
+                        : Colors.grey[300],
+                    child: Icon(
+                      _state.trilha[i].concluido
+                          ? Icons.check
+                          : (_state.desbloqueado(i)
+                          ? Icons.play_arrow
+                          : Icons.lock_outline),
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                 ),
               ),
-            );
-          }).toList(),
+          ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildBottomNav() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: const [
-          _NavItem(icon: Icons.home, label: 'Home'),
-          _NavItem(icon: Icons.map_outlined, label: 'Trilhas'),
-          _NavItem(icon: Icons.flag_outlined, label: 'Desafios'),
-          _NavItem(icon: Icons.person_outline, label: 'Perfil'),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _NavItem({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 22, color: const Color(0xFF16326B)),
-        const SizedBox(height: 2),
-        Text(label, style: const TextStyle(fontSize: 11)),
       ],
     );
   }

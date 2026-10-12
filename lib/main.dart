@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'screens/home_screen.dart';
+
+import 'app_routes.dart';
+import 'navigation/log_observer.dart';
 
 void main() {
   runApp(const CodeUpApp());
@@ -14,7 +16,11 @@ class CodeUpApp extends StatelessWidget {
       title: 'CodeUp',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const HomeScreen(),
+      // Rotas nomeadas centralizadas (mapeamento no MaterialApp).
+      initialRoute: AppRoutes.splash,
+      routes: AppRoutes.routes,
+      // Log da pilha do Navigator raiz (splash/login/principal/configurações).
+      navigatorObservers: [LogObserver('Raiz')],
     );
   }
 }
