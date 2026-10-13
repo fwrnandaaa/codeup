@@ -7,16 +7,20 @@ import '../models/app_state.dart';
 /// atual) enviando [DesafioArgs] como argumento e aguardando o
 /// [DesafioResultado] devolvido via Navigator.pop(context, resultado).
 Future<void> abrirDesafio(BuildContext context, String tema) async {
-  final resultado = await Navigator.of(context).pushNamed<DesafioResultado>(
+  // Sem <T> no pushNamed: as rotas das abas são MaterialPageRoute<dynamic>,
+  // e o Dart não converte Route<dynamic> em Route<DesafioResultado>.
+  // O tipo do retorno é conferido logo abaixo com "is".
+  final retorno = await Navigator.of(context).pushNamed(
     AppRoutes.desafio,
     arguments: DesafioArgs(tema),
   );
 
-  if (resultado == null) {
+  if (retorno is! DesafioResultado) {
     debugPrint('[NAV] Desafio "$tema" fechado sem resultado (pop sem valor)');
     return;
   }
 
+  final resultado = retorno;
   debugPrint('[NAV] Resultado recebido do pop: $resultado');
   AppState.instance.registrar(resultado);
 
